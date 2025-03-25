@@ -119,6 +119,73 @@ export function createActions(windowManager) {
         }
       },
     },
+    NewTab: {
+      label: "New Tab",
+      accelerator: "CommandOrControl+T",
+      click: (focusedWindow) => {
+        if (focusedWindow) {
+          focusedWindow.webContents.executeJavaScript(`
+            document.querySelector('tab-bar').createNewTab();
+          `);
+        }
+      },
+    },
+    CloseTab: {
+      label: "Close Tab",
+      accelerator: "CommandOrControl+W",
+      click: (focusedWindow) => {
+        if (focusedWindow) {
+          focusedWindow.webContents.executeJavaScript(`
+            const tabBar = document.querySelector('tab-bar');
+            const windowId = tabBar.windowId;
+            const activeTab = window.tabManager.getActiveTab(windowId);
+            if (activeTab) {
+              tabBar.closeTab(activeTab.id);
+            }
+          `);
+        }
+      },
+    },
+    NextTab: {
+      label: "Next Tab",
+      accelerator: "CommandOrControl+Tab",
+      click: (focusedWindow) => {
+        if (focusedWindow) {
+          focusedWindow.webContents.executeJavaScript(`
+            const tabBar = document.querySelector('tab-bar');
+            const windowId = tabBar.windowId;
+            const tabs = window.tabManager.getAllTabs(windowId);
+            const activeTab = window.tabManager.getActiveTab(windowId);
+            
+            if (tabs.length <= 1 || !activeTab) return;
+            
+            const currentIndex = tabs.findIndex(tab => tab.id === activeTab.id);
+            const nextIndex = (currentIndex + 1) % tabs.length;
+            tabBar.activateTab(tabs[nextIndex].id);
+          `);
+        }
+      },
+    },
+    PreviousTab: {
+      label: "Previous Tab",
+      accelerator: "CommandOrControl+Shift+Tab",
+      click: (focusedWindow) => {
+        if (focusedWindow) {
+          focusedWindow.webContents.executeJavaScript(`
+            const tabBar = document.querySelector('tab-bar');
+            const windowId = tabBar.windowId;
+            const tabs = window.tabManager.getAllTabs(windowId);
+            const activeTab = window.tabManager.getActiveTab(windowId);
+            
+            if (tabs.length <= 1 || !activeTab) return;
+            
+            const currentIndex = tabs.findIndex(tab => tab.id === activeTab.id);
+            const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+            tabBar.activateTab(tabs[prevIndex].id);
+          `);
+        }
+      },
+    },
   };
 
   return actions;

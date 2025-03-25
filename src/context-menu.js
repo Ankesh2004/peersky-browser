@@ -138,6 +138,36 @@ export function attachContextMenus(browserWindow, windowManager) {
         );
       }
 
+      // Add Tab-specific options
+      menu.append(new MenuItem({ type: "separator" }));
+      
+      menu.append(
+        new MenuItem({
+          label: "New Tab",
+          accelerator: "CommandOrControl+T",
+          click: () => {
+            browserWindow.webContents.executeJavaScript(`
+              document.querySelector('tab-bar').createNewTab();
+            `);
+          },
+        })
+      );
+      
+      // If link is under the cursor, add "Open Link in New Tab" option
+      if (params.linkURL) {
+        menu.append(
+          new MenuItem({
+            label: "Open Link in New Tab",
+            click: () => {
+              browserWindow.webContents.executeJavaScript(`
+                const tabBar = document.querySelector('tab-bar');
+                tabBar.createNewTab("${params.linkURL}");
+              `);
+            },
+          })
+        );
+      }
+
       menu.popup();
     });
   };

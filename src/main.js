@@ -9,6 +9,7 @@ import { ipfsOptions, hyperOptions } from "./protocols/config.js";
 import { registerShortcuts } from "./actions.js";
 import { setupAutoUpdater } from "./auto-updater.js";
 import WindowManager from "./window-manager.js";
+import { tabManager } from "./tab-manager.js";
 import { attachContextMenus, setWindowManager } from "./context-menu.js";
 
 const __dirname = fileURLToPath(new URL("./", import.meta.url));
@@ -48,6 +49,9 @@ app.whenReady().then(async () => {
 
   // Set the WindowManager instance in context-menu.js
   setWindowManager(windowManager);
+
+  // Initialize tabManager
+  tabManager.init();
 
   await setupProtocols(session.defaultSession);
 
@@ -131,4 +135,4 @@ app.on("activate", () => {
   }
 });
 
-export { windowManager };
+export { windowManager,tabManager };

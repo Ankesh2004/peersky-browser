@@ -122,6 +122,132 @@ document.addEventListener("DOMContentLoaded", () => {
   } else {
     console.error("webviewContainer or nav not found");
   }
+
+  // Set up tab-related events
+  const tabBar = document.querySelector("#tabbar");
+  if (tabBar && webviewContainer) {
+    // When a tab is activated, update the URL bar
+    tabBar.addEventListener("tab-activated", async ({ detail }) => {
+      const { tabId } = detail;
+      const windowId = tabBar.windowId;
+      
+      // Get current tab data
+      const tabs = tabManager.getAllTabs(windowId);
+      const activeTab = tabs.find(tab => tab.id === tabId);
+      
+      if (activeTab && nav) {
+        const urlInput = nav.querySelector("#url");
+        if (urlInput) {
+          urlInput.value = activeTab.url;
+        }
+        
+        // Update window title
+        document.title = activeTab.title ? `${activeTab.title} - Peersky Browser` : "Peersky Browser";
+        
+        // Update navigation buttons
+        nav.setNavigationButtons(activeTab.canGoBack, activeTab.canGoForward);
+      }
+    });
+    
+    // When URL is updated via navigation bar
+    nav.addEventListener("navigate", ({ detail }) => {
+      const { url } = detail;
+      const processedUrl = handleURL(url);
+      webviewContainer.loadURL(processedUrl);
+    });
+    
+    // When a webview updates its title
+    webviewContainer.addEventListener("page-title-updated", ({ detail }) => {
+      const { tabId, title } = detail;
+      const windowId = tabBar.windowId;
+      
+      // Update tab UI to reflect new title
+      tabBar.render();
+      
+      // Update window title if this is the active tab
+      const activeTab = tabManager.getActiveTab(windowId);
+      if (activeTab && activeTab.id === tabId) {
+        document.title = title ? `${title} - Peersky Browser` : "Peersky Browser";
+      }
+    });
+    
+    // When a webview updates its URL
+    webviewContainer.addEventListener("did-navigate", ({ detail }) => {
+      const { tabId, url } = detail;
+      const windowId = tabBar.windowId;
+      
+      // Update URL bar if this is the active tab
+      const activeTab = tabManager.getActiveTab(windowId);
+      if (activeTab && activeTab.id === tabId && nav) {
+        const urlInput = nav.querySelector("#url");
+        if (urlInput) {
+          urlInput.value = url;
+        }
+      }
+      
+      // Save tab state
+      tabManager.saveTabState(windowId);
+    });
+    
+    // Keyboard shortcuts for tabs
+    document.addEventListener("keydown", (e) => {
+      // Ctrl+T: New tab
+      if (e.key === "t" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        tabBar.createNewTab();
+      }
+      
+      // Ctrl+W: Close tab
+      if (e.key === "w" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        const windowId = tabBar.windowId;
+        const activeTab = tabManager.getActiveTab(windowId);
+        if (activeTab) {
+          tabBar.closeTab(activeTab.id);
+        }
+      }
+      
+      // Ctrl+Tab: Next tab
+      if (e.key === "Tab" && e.ctrlKey && !e.shiftKey) {
+        e.preventDefault();
+        const windowId = tabBar.windowId;
+        const tabs = tabManager.getAllTabs(windowId);
+        const activeTab = tabManager.getActiveTab(windowId);
+        
+        if (tabs.length <= 1 || !activeTab) return;
+        
+        const currentIndex = tabs.findIndex(tab => tab.id === activeTab.id);
+        const nextIndex = (currentIndex + 1) % tabs.length;
+        tabBar.activateTab(tabs[nextIndex].id);
+      }
+      
+      // Ctrl+Shift+Tab: Previous tab
+      if (e.key === "Tab" && e.ctrlKey && e.shiftKey) {
+        e.preventDefault();
+        const windowId = tabBar.windowId;
+        const tabs = tabManager.getAllTabs(windowId);
+        const activeTab = tabManager.getActiveTab(windowId);
+        
+        if (tabs.length <= 1 || !activeTab) return;
+        
+        const currentIndex = tabs.findIndex(tab => tab.id === activeTab.id);
+        const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        tabBar.activateTab(tabs[prevIndex].id);
+      }
+      
+      // Ctrl+1-9: Switch to specific tab
+      if (e.key >= "1" && e.key <= "9" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        const tabIndex = parseInt(e.key) - 1;
+        const windowId = tabBar.windowId;
+        const tabs = tabManager.getAllTabs(windowId);
+        
+        if (tabIndex < tabs.length) {
+          tabBar.activateTab(tabs[tabIndex].id);
+        }
+      }
+    });
+  }
 });
 
 function updateNavigationButtons() {

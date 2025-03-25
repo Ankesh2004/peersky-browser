@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs-extra";
 import { fileURLToPath } from "url";
 import { attachContextMenus } from "./context-menu.js";
+import { tabManager } from "./tab-manager.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PERSIST_FILE = path.join(app.getPath("userData"), "lastOpened.json");
@@ -95,6 +96,9 @@ class WindowManager {
           error
         );
       }
+
+      // Also save tab state
+      tabManager.saveTabState(window.id);
     }
 
     try {
@@ -222,6 +226,9 @@ class PeerskyWindow {
 
     this.id = this.window.webContents.id;
 
+    // Initialize tabs for this window
+    tabManager.initWindow(this.id);
+
     const loadURL = path.join(__dirname, "./pages/index.html");
     const query = { query: { url: url || "peersky://home" } };
     this.window.loadFile(loadURL, query);
@@ -266,6 +273,13 @@ class PeerskyWindow {
           .catch((error) => {
             console.error("Error injecting script into webContents:", error);
           });
+
+        // Set window ID for tab management
+        this.window.webContents.executeJavaScript(`
+          window.dispatchEvent(new CustomEvent('set-window-id', { 
+            detail: { windowId: ${this.id} }
+          }));
+        `);
       }
     });
 
