@@ -1,0 +1,43 @@
+{
+   "action": {
+      "default_icon": {
+         "128": "./assets/logo128.png",
+         "16": "./assets/logo16.png",
+         "48": "./assets/logo48.png",
+         "512": "./assets/logo512.png",
+         "64": "./assets/logo64.png",
+         "96": "./assets/logo96.png"
+      },
+      "default_title": "ChatGPT to PDF"
+   },
+   "background": {
+      "service_worker": "background.js"
+   },
+   "content_scripts": [ {
+      "js": [ "contentScript.js", "wall.js" ],
+      "matches": [ "*://chatgpt.com/*" ]
+   } ],
+   "default_locale": "en",
+   "description": "__MSG_appDesc__",
+   "differential_fingerprint": "1.ac5ff65baf8736b898a82016e6d4cccccf884888a99b7cd2385437753cad84eb",
+   "homepage_url": "https://www.chatgpt2pdf.app",
+   "host_permissions": [ "*://chatgpt.com/*" ],
+   "icons": {
+      "128": "./assets/logo128.png",
+      "16": "./assets/logo16.png",
+      "48": "./assets/logo48.png",
+      "512": "./assets/logo512.png",
+      "64": "./assets/logo64.png",
+      "96": "./assets/logo96.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5habv1ZMh4UyDUJMBMhUwbymaqquS59lm5gSAwgr62QcPhUxCj+Kc8jBWpDDtWVKx8AFhlz/dq0LUaThijC94Fg5cUGo5urfJWWi9jZ87jT1lyo+G6SZoeDNWPb4VUmpx09nw7QOmFC0OHUnYF6WavOhXTtN4peIzt3g81NUSRHNdEEtMdavD2tzUOfpzkuTpcuGjrNzVzSZHi1+EdQF4Mi6hLMRrSRjVAsuIrCzp1MYpawelkYi6q05wW3hPF6y3PxFwX/XnTs7Cr2M/Wv9jec4toIsC+gjydm9cpMpNAp9GvAHJJpgSPzrrNF2aKK9JvBIdkjiOn3ed5KQKeFwxwIDAQAB",
+   "manifest_version": 3,
+   "name": "__MSG_appName__",
+   "permissions": [ "activeTab", "downloads", "storage" ],
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "1.2.5",
+   "web_accessible_resources": [ {
+      "matches": [ "*://chatgpt.com/*" ],
+      "resources": [ "assets/download_instruction.mp4" ]
+   } ]
+}

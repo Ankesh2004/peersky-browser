@@ -215,7 +215,9 @@ class PeerskyWindow {
         nodeIntegration: true,
         contextIsolation: false,
         nativeWindowOpen: true,
+        enableRemoteModule: true,
         webviewTag: true,
+        preload: path.join(__dirname, 'preload.js'),
       },
       ...windowOptions,
     });

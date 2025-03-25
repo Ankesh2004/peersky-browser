@@ -1,0 +1,34 @@
+{
+   "action": {
+      "default_popup": "index.html",
+      "default_title": "CodingDude"
+   },
+   "author": "https://github.com/Dhruv35M",
+   "background": {
+      "service_worker": "background.js"
+   },
+   "commands": {
+      "_execute_action": {
+         "description": "Toggle My Chrome Extension",
+         "suggested_key": {
+            "default": "Ctrl+Shift+X",
+            "mac": "MacCtrl+Shift+X",
+            "windows": "Ctrl+Shift+X"
+         }
+      }
+   },
+   "description": "Dominate coding challenges with CodingDude: Live, upcoming & 24-hour contests. Elevate skills and excel in programming!",
+   "icons": {
+      "128": "icons/icon128.png",
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmXVtbB7AIOozezo1cVr0U2jazAVuhXb2WoCwzkgKkqbOZ+dvuE3JT9mWWVOmZ76DEVjmlnKf0HUmOX6LIqeLMsy8x3XNCJjNie3pu4MDCCDZzqHcaYCjoRjWpvjrNt0xwyroyGo/BcteVnv9Ri5nRPkzD/uEAcPa8jMIIgl9A+z4x4ul1HdJiKkXWeVM50asAbClD5PG+9Ib1bG4kAWFM58h6RzGJudJslCYWe+dZYkWGhr0VyHeCOKIDWEnB4N+WQDDNWqdnqZ6UKDYY0fQzz6+zwlFFQpXpiLNZ09xHj/nPby94vQ1QXuuCLSIxBx26sAVvrWYInMqDQxvyXpMYQIDAQAB",
+   "manifest_version": 3,
+   "name": "CodingDude - Contest Reminder",
+   "permissions": [ "alarms", "notifications" ],
+   "short_name": "CodingDude",
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "0.1.5"
+}

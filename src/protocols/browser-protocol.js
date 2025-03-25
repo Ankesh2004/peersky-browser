@@ -55,6 +55,17 @@ export async function createHandler() {
         }
         break;
       case '.js':
+        if (!fs.existsSync(absolutePath)) {
+          sendResponse({
+            statusCode: 404,
+            headers: { "Content-Type": "text/plain" },
+            data: "JavaScript file not found",
+          });
+          return;
+        }
+        // Set correct content type for JavaScript files
+        contentType = "text/javascript";
+        break;
       case '.css':
       case '.png':
       case '.jpg':
