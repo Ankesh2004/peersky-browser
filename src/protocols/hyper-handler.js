@@ -264,6 +264,7 @@ async function handleChatRequest(req, callback, session) {
         const myFeed = localRoomFeeds[roomKey];
         for (let i = 0; i < myFeed.length; i++) {
           const msg = await myFeed.get(i);
+          console.log(`Replaying local message at index ${i}:`, msg);
           stream.write(`data: ${JSON.stringify(msg)}\n\n`);
         }
       }
@@ -273,6 +274,7 @@ async function handleChatRequest(req, callback, session) {
           const rFeed = remoteRoomFeeds[roomKey][remoteKey];
           for (let i = 0; i < rFeed.length; i++) {
             const msg = await rFeed.get(i);
+            console.log(`Replaying remote message from feed ${remoteKey} at index ${i}:`, msg);
             stream.write(`data: ${JSON.stringify(msg)}\n\n`);
           }
         }
@@ -390,7 +392,6 @@ async function joinChatRoom(roomKey) {
   }
   // If we haven't yet created our local personal feed for this room, do so.
   if (!localRoomFeeds[roomKey]) {
-    // Instead of a deterministic name, we generate a unique feed.
     const feed = sdk.corestore.get({
       name: `chat-${roomKey}-${crypto.randomBytes(4).toString("hex")}`,
       valueEncoding: "json"
