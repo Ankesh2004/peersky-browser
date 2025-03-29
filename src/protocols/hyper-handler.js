@@ -1,3 +1,4 @@
+// hyper-handler.js
 import { create as createSDK } from "hyper-sdk";
 import makeHyperFetch from "hypercore-fetch";
 import { Readable, PassThrough } from "stream";
@@ -11,14 +12,26 @@ import { hyperOptions, loadKeyPair, saveKeyPair } from "./config.js";
 let sdk, fetch;
 let swarm = null;
 
-// Mapping: roomKey -> hypercore feed (stores chat messages)
-const roomFeeds = {};
+// Mapping: roomKey -> local personal feed for that room (our own feed)
+const localRoomFeeds = {}; 
+// Mapping: roomKey -> mapping of remote feed keys (hex string) to remote Hypercore feeds
+const remoteRoomFeeds = {}; 
 // Mapping: roomKey -> array of SSE clients (for real-time updates)
 const roomSseClients = {};
 
 let peers = [];
 // Keep track of which rooms we’ve joined in the swarm (avoid double-joining)
 const joinedRooms = new Set();
+
+// Utility: Broadcast our local feed key to all connected peers
+function broadcastHello(roomKey, myFeedKey) {
+  const helloMsg = JSON.stringify({
+    type: "hello",
+    roomKey,
+    feedKey: myFeedKey
+  });
+  sendMessageToPeers(helloMsg);
+}
 
 function createDHT() {
   const dht = new HyperDHT({ ephemeral: false });
@@ -88,12 +101,20 @@ async function initializeSwarm() {
     console.log(`Peers connected: ${peers.length}`);
     broadcastPeerCount();
 
-    // Replicate all known feeds on this connection.
-    for (const feed of Object.values(roomFeeds)) {
+    // Replicate our own local feeds as well as all discovered remote feeds
+    // (Note: store all feeds in both localRoomFeeds and remoteRoomFeeds)
+    for (const roomKey of Object.keys(localRoomFeeds)) {
+      const feed = localRoomFeeds[roomKey];
       feed.replicate(connection);
     }
+    for (const roomKey of Object.keys(remoteRoomFeeds)) {
+      for (const feedKey in remoteRoomFeeds[roomKey]) {
+        remoteRoomFeeds[roomKey][feedKey].replicate(connection);
+      }
+    }
 
-    connection.on("data", (rawData) => {
+    // Listen for incoming data:
+    connection.on("data", async (rawData) => {
       let msg;
       try {
         msg = JSON.parse(rawData.toString());
@@ -104,17 +125,38 @@ async function initializeSwarm() {
           timestamp: Date.now(),
         };
       }
-      msg.sender = shortID;
-      if (!msg.timestamp) msg.timestamp = Date.now();
-      console.log(`Peer [${shortID}] =>`, msg);
-      if (msg.roomKey && roomFeeds[msg.roomKey]) {
-        appendMessageToFeed(msg.roomKey, {
-          sender: msg.sender,
-          message: msg.message,
-          timestamp: msg.timestamp,
-        }).catch((err) => {
-          console.error("Error appending peer msg to feed:", err);
-        });
+      // If message is a hello announcement with a feed key, add that remote feed
+      if (msg.type === "hello" && msg.roomKey && msg.feedKey) {
+        if (!remoteRoomFeeds[msg.roomKey]) remoteRoomFeeds[msg.roomKey] = {};
+        if (!remoteRoomFeeds[msg.roomKey][msg.feedKey]) {
+          console.log(`Peer [${shortID}] announced new feed: ${msg.feedKey} in room ${msg.roomKey}`);
+          // Load the remote feed using the SDK's corestore
+          const remoteFeed = sdk.corestore.get({
+            key: b4a.from(msg.feedKey, "hex"),
+            valueEncoding: "json",
+          });
+          await remoteFeed.ready();
+          remoteRoomFeeds[msg.roomKey][msg.feedKey] = remoteFeed;
+          // Replicate this newly discovered remote feed on this connection:
+          remoteFeed.replicate(connection);
+        }
+      } else {
+        // Otherwise, treat the message as a regular chat message
+        msg.sender = shortID;
+        if (!msg.timestamp) msg.timestamp = Date.now();
+        console.log(`Peer [${shortID}] =>`, msg);
+        // Append message to local feed if the message includes a roomKey and we have a local feed for it
+        if (msg.roomKey && localRoomFeeds[msg.roomKey]) {
+          try {
+            await appendMessageToLocalFeed(msg.roomKey, {
+              sender: msg.sender,
+              message: msg.message,
+              timestamp: msg.timestamp,
+            });
+          } catch (err) {
+            console.error("Error appending peer msg to local feed:", err);
+          }
+        }
       }
     });
 
@@ -176,36 +218,29 @@ async function handleChatRequest(req, callback, session) {
       callback({
         statusCode: 200,
         headers: { "Content-Type": "application/json" },
-        data: Readable.from([
-          Buffer.from(JSON.stringify({ roomKey: newRoomKey })),
-        ]),
+        data: Readable.from([Buffer.from(JSON.stringify({ roomKey: newRoomKey }))]),
       });
     } else if (method === "POST" && action === "join") {
-      // Join an existing room
       if (!roomKey) throw new Error("Missing roomKey in join request");
       console.log("Joining chat room:", roomKey);
+      // Join the room by creating your personal feed if not already created.
       await joinChatRoom(roomKey);
       callback({
         statusCode: 200,
         headers: { "Content-Type": "application/json" },
-        data: Readable.from([
-          Buffer.from(JSON.stringify({ message: "Joined chat room" })),
-        ]),
+        data: Readable.from([Buffer.from(JSON.stringify({ message: "Joined chat room" }))]),
       });
     } else if (method === "POST" && action === "send") {
-      // Send a message
       if (!roomKey) throw new Error("Missing roomKey in send request");
       const { sender, message } = await getJSONBody(uploadData, session);
       console.log(`Sending message [${sender}]: ${message}`);
-
-      // Append to feed
-      await appendMessageToFeed(roomKey, {
+      // Append message to our own local feed
+      await appendMessageToLocalFeed(roomKey, {
         sender,
         message,
         timestamp: Date.now(),
       });
-
-      // Broadcast to peers
+      // Broadcast a JSON message that includes the roomKey so peers know which feed to use.
       const data = JSON.stringify({
         sender,
         message,
@@ -213,49 +248,47 @@ async function handleChatRequest(req, callback, session) {
         roomKey,
       });
       sendMessageToPeers(data);
-
       callback({
         statusCode: 200,
         headers: { "Content-Type": "application/json" },
-        data: Readable.from([
-          Buffer.from(JSON.stringify({ message: "Message sent" })),
-        ]),
+        data: Readable.from([Buffer.from(JSON.stringify({ message: "Message sent" }))]),
       });
     } else if (method === "GET" && action === "receive") {
-      // SSE for receiving messages in real-time
       if (!roomKey) throw new Error("Missing roomKey in receive request");
       console.log("Setting up SSE for room:", roomKey);
-
-      const feed = roomFeeds[roomKey];
-      if (!feed) throw new Error("Feed not initialized for this room");
-
+      // For SSE, create a new stream and replay history from ALL feeds for the room
       const stream = new PassThrough();
-      session.messageStream = stream; // keep reference
-
-      // Replay the entire feed so the client sees the full history
-      for (let i = 0; i < feed.length; i++) {
-        const msg = await feed.get(i);
-        stream.write(`data: ${JSON.stringify(msg)}\n\n`);
+      session.messageStream = stream;
+      // Replay messages from our local feed
+      if (localRoomFeeds[roomKey]) {
+        const myFeed = localRoomFeeds[roomKey];
+        for (let i = 0; i < myFeed.length; i++) {
+          const msg = await myFeed.get(i);
+          stream.write(`data: ${JSON.stringify(msg)}\n\n`);
+        }
       }
-
+      // Replay messages from each remote feed
+      if (remoteRoomFeeds[roomKey]) {
+        for (const remoteKey in remoteRoomFeeds[roomKey]) {
+          const rFeed = remoteRoomFeeds[roomKey][remoteKey];
+          for (let i = 0; i < rFeed.length; i++) {
+            const msg = await rFeed.get(i);
+            stream.write(`data: ${JSON.stringify(msg)}\n\n`);
+          }
+        }
+      }
       // Keep the SSE connection alive
       const keepAlive = setInterval(() => {
         stream.write(":\n\n");
       }, 15000);
-
-      // Track SSE client
       if (!roomSseClients[roomKey]) {
         roomSseClients[roomKey] = [];
       }
       roomSseClients[roomKey].push(stream);
-
       stream.on("close", () => {
         clearInterval(keepAlive);
-        roomSseClients[roomKey] = roomSseClients[roomKey].filter(
-          (s) => s !== stream
-        );
+        roomSseClients[roomKey] = roomSseClients[roomKey].filter((s) => s !== stream);
       });
-
       callback({
         statusCode: 200,
         headers: {
@@ -266,7 +299,6 @@ async function handleChatRequest(req, callback, session) {
         data: stream,
       });
     } else {
-      // Unknown action
       callback({
         statusCode: 400,
         headers: { "Content-Type": "text/plain" },
@@ -286,8 +318,7 @@ async function handleChatRequest(req, callback, session) {
 // Handle general hyper:// requests not related to “chat” API routes.
 async function handleHyperRequest(req, callback, session) {
   const { url, method = "GET", headers = {}, uploadData } = req;
-  const fetchFn = await initializeHyperSDK(); // ensure sdk/fetch is initted
-
+  const fetchFn = await initializeHyperSDK();
   let body;
   if (uploadData) {
     try {
@@ -302,7 +333,6 @@ async function handleHyperRequest(req, callback, session) {
       return;
     }
   }
-
   try {
     const resp = await fetchFn(url, {
       method,
@@ -336,7 +366,58 @@ async function handleHyperRequest(req, callback, session) {
   }
 }
 
-// Helper: read the upload body (files, bytes, or blobs) into a stream.
+// Helper: Append a message object to our local feed for a given roomKey.
+async function appendMessageToLocalFeed(roomKey, { sender, message, timestamp }) {
+  const feed = localRoomFeeds[roomKey];
+  if (!feed) {
+    throw new Error(`Local feed not initialized for room ${roomKey}`);
+  }
+  const obj = { sender, message, timestamp: timestamp || Date.now() };
+  await feed.append(obj);
+}
+
+// Helper: Create a new chat room key.
+async function generateChatRoom() {
+  const buf = crypto.randomBytes(32);
+  return b4a.toString(buf, "hex");
+}
+
+// Join a chat room: create your personal feed and start replication.
+async function joinChatRoom(roomKey) {
+  // Initialize remote feeds mapping for the room if not exists.
+  if (!remoteRoomFeeds[roomKey]) {
+    remoteRoomFeeds[roomKey] = {};
+  }
+  // If we haven't yet created our local personal feed for this room, do so.
+  if (!localRoomFeeds[roomKey]) {
+    // Instead of a deterministic name, we generate a unique feed.
+    const feed = sdk.corestore.get({ valueEncoding: "json" });
+    await feed.ready();
+    localRoomFeeds[roomKey] = feed;
+    console.log(`Created local feed for room ${roomKey}, key: ${b4a.toString(feed.key, "hex")}`);
+    // Set up SSE broadcast: when new messages are appended to our local feed, forward them to SSE clients.
+    feed.on("append", async () => {
+      const idx = feed.length - 1;
+      const msg = await feed.get(idx);
+      const sseArray = roomSseClients[roomKey] || [];
+      for (const s of sseArray) {
+        s.write(`data: ${JSON.stringify(msg)}\n\n`);
+      }
+    });
+    // Now, join the swarm for the room if not already joined.
+    if (!joinedRooms.has(roomKey)) {
+      joinedRooms.add(roomKey);
+      const topicBuf = b4a.from(roomKey, "hex");
+      swarm.join(topicBuf, { client: true, server: true });
+      await swarm.flush();
+      console.log(`Joined swarm for room: ${roomKey}`);
+    }
+    // Broadcast our local feed key to all peers in the room.
+    broadcastHello(roomKey, b4a.toString(feed.key, "hex"));
+  }
+}
+
+// Helper: read the upload body into a stream.
 function readBody(body, session) {
   const stream = new PassThrough();
   (async () => {
@@ -365,7 +446,7 @@ function readBody(body, session) {
   return stream;
 }
 
-// Helper: read JSON body from a request.
+// Helper: Read JSON body from a request.
 async function getJSONBody(uploadData, session) {
   const stream = readBody(uploadData, session);
   const chunks = [];
@@ -377,7 +458,7 @@ async function getJSONBody(uploadData, session) {
   return JSON.parse(buf.toString());
 }
 
-// Broadcast updated peer count to all SSE clients (in all rooms).
+// Broadcast updated peer count to all SSE clients.
 function broadcastPeerCount() {
   const cnt = peers.length;
   console.log(`Broadcasting peer count: ${cnt}`);
@@ -388,68 +469,14 @@ function broadcastPeerCount() {
   }
 }
 
-// Send a raw data string to all currently connected peers (swarm connections).
+// Send a raw data string to all currently connected peers.
 function sendMessageToPeers(data) {
   console.log(`Broadcasting message to ${peers.length} peers`);
   for (const { connection } of peers) {
-    // If the connection is still open, write data
     if (!connection.destroyed) {
       connection.write(data);
     }
   }
 }
 
-// Append a message object to the feed for a given roomKey.
-async function appendMessageToFeed(roomKey, { sender, message, timestamp }) {
-  const feed = roomFeeds[roomKey];
-  if (!feed) {
-    throw new Error(`Feed not initialized for room ${roomKey}`);
-  }
-  const obj = {
-    sender,
-    message,
-    timestamp: timestamp || Date.now(),
-  };
-  await feed.append(obj);
-}
-
-// Create a brand-new random 32-byte hex “roomKey”.
-async function generateChatRoom() {
-  const buf = crypto.randomBytes(32);
-  return b4a.toString(buf, "hex");
-}
-
-// Join a chat room: create/load the feed, join the swarm topic, etc.
-async function joinChatRoom(roomKey) {
-  // 1) Load the feed deterministically using the room key via the 'name' option.
-  let feed = roomFeeds[roomKey];
-  if (!feed) {
-    feed = sdk.corestore.get({
-      name: "chat-" + roomKey, // Use a deterministic name so every device gets the same feed.
-      valueEncoding: "json",
-    });
-    await feed.ready();
-    roomFeeds[roomKey] = feed;
-
-    // 2) When new entries are appended to this feed, broadcast them via SSE.
-    feed.on("append", async () => {
-      const idx = feed.length - 1;
-      const msg = await feed.get(idx);
-      const sseArray = roomSseClients[roomKey] || [];
-      for (const s of sseArray) {
-        s.write(`data: ${JSON.stringify(msg)}\n\n`);
-      }
-    });
-  }
-
-  // 3) Join the swarm (only once per room)
-  if (!joinedRooms.has(roomKey)) {
-    joinedRooms.add(roomKey);
-    const topicBuf = b4a.from(roomKey, "hex");
-    swarm.join(topicBuf, { client: true, server: true });
-    await swarm.flush();
-    console.log(`Joined swarm for room: ${roomKey}`);
-  } else {
-    console.log(`Already joined swarm for room: ${roomKey}`);
-  }
-}
+export { localRoomFeeds, remoteRoomFeeds };
