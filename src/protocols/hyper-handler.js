@@ -391,7 +391,11 @@ async function joinChatRoom(roomKey) {
   // If we haven't yet created our local personal feed for this room, do so.
   if (!localRoomFeeds[roomKey]) {
     // Instead of a deterministic name, we generate a unique feed.
-    const feed = sdk.corestore.get({ valueEncoding: "json" });
+    const feed = sdk.corestore.get({
+      name: `chat-${roomKey}-${crypto.randomBytes(4).toString("hex")}`,
+      valueEncoding: "json"
+    });
+    
     await feed.ready();
     localRoomFeeds[roomKey] = feed;
     console.log(`Created local feed for room ${roomKey}, key: ${b4a.toString(feed.key, "hex")}`);
