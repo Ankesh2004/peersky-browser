@@ -386,21 +386,19 @@ async function generateChatRoom() {
 
 // Join a chat room: create your personal feed and start replication.
 async function joinChatRoom(roomKey) {
-  // Initialize remote feeds mapping for the room if not exists.
-  if (!remoteRoomFeeds[roomKey]) {
-    remoteRoomFeeds[roomKey] = {};
-  }
-  // If we haven't yet created our local personal feed for this room, do so.
+  // Use a deterministic name combining roomKey and your device's ID so that the same feed is reused
   if (!localRoomFeeds[roomKey]) {
+    const deviceId = b4a.toString(hyperOptions.keyPair.publicKey, "hex").substr(0, 6);
     const feed = sdk.corestore.get({
-      name: `chat-${roomKey}-${crypto.randomBytes(4).toString("hex")}`,
+      name: `chat-${roomKey}-${deviceId}`,
       valueEncoding: "json"
     });
-    
     await feed.ready();
     localRoomFeeds[roomKey] = feed;
-    console.log(`Created local feed for room ${roomKey}, key: ${b4a.toString(feed.key, "hex")}`);
-    // Set up SSE broadcast: when new messages are appended to our local feed, forward them to SSE clients.
+    console.log(
+      `Created local feed for room ${roomKey}, key: ${b4a.toString(feed.key, "hex")}`
+    );
+    // Set up local feed's "append" handler to forward new messages to SSE clients.
     feed.on("append", async () => {
       const idx = feed.length - 1;
       const msg = await feed.get(idx);
@@ -409,18 +407,21 @@ async function joinChatRoom(roomKey) {
         s.write(`data: ${JSON.stringify(msg)}\n\n`);
       }
     });
-    // Now, join the swarm for the room if not already joined.
-    if (!joinedRooms.has(roomKey)) {
-      joinedRooms.add(roomKey);
-      const topicBuf = b4a.from(roomKey, "hex");
-      swarm.join(topicBuf, { client: true, server: true });
-      await swarm.flush();
-      console.log(`Joined swarm for room: ${roomKey}`);
-    }
-    // Broadcast our local feed key to all peers in the room.
-    broadcastHello(roomKey, b4a.toString(feed.key, "hex"));
   }
+
+  // Join the swarm if not already joined
+  if (!joinedRooms.has(roomKey)) {
+    joinedRooms.add(roomKey);
+    const topicBuf = b4a.from(roomKey, "hex");
+    swarm.join(topicBuf, { client: true, server: true });
+    await swarm.flush();
+    console.log(`Joined swarm for room: ${roomKey}`);
+  }
+  
+  // Broadcast our local feed key so that remote peers can replicate our feed
+  broadcastHello(roomKey, b4a.toString(localRoomFeeds[roomKey].key, "hex"));
 }
+
 
 // Helper: read the upload body into a stream.
 function readBody(body, session) {
