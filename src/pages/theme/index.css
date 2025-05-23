@@ -24,6 +24,8 @@ input, button, textarea, select, select *, option  {
   gap: 8px;
   padding: 8px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .match-count {
@@ -228,12 +230,17 @@ find-menu {
   display: flex;
   flex-direction: column;
   width: 100%;
+  position: sticky; 
+  top: 38px;
+  z-index: 999;
+  background-color: var(--peersky-nav-background);
   margin-top: 38px;
 }
 
 /* Adjust webview height to account for tabs */
 tracked-box {
-  height: calc(100vh - 86px - 38px) !important; /* 50px for navbar + 36px for tabbar + 38px titlebar */
+  height: calc(100vh - 88px) !important;
+  width: 100%;
 }
 
 /* Add this to your existing CSS */
