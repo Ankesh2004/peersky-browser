@@ -7,11 +7,57 @@ class TabBar extends HTMLElement {
     this.webviews = new Map(); // Store webviews by tab ID
     this.webviewContainer = null; // Will be set by connectWebviewContainer
     this.buildTabBar();
+    this.setupBrowserCloseHandler();
   }
 
   // Connect to the webview container where all webviews will live
   connectWebviewContainer(container) {
     this.webviewContainer = container;
+    // After connecting container, restore or create initial tabs
+    this.restoreOrCreateInitialTabs();
+    
+    // Force activation of the initial tab's webview after a delay
+    setTimeout(() => this.forceActivateCurrentTab(), 300);
+  }
+
+  // Force activate the current tab's webview
+  forceActivateCurrentTab() {
+    if (!this.activeTabId) {
+      // No active tab, select the first one
+      if (this.tabs.length > 0) {
+        this.selectTab(this.tabs[0].id);
+      }
+      return;
+    }
+
+    // Re-select the active tab to force webview initialization
+    this.selectTab(this.activeTabId);
+    
+    // Get the active webview
+    const activeWebview = this.webviews.get(this.activeTabId);
+    if (!activeWebview) return;
+    
+    // Force display and focus
+    activeWebview.style.display = "flex";
+    activeWebview.focus();
+    
+    // Get current URL and reload if needed
+    const tab = this.tabs.find(tab => tab.id === this.activeTabId);
+    if (tab && tab.url) {
+      // Force reload the current URL
+      activeWebview.setAttribute("src", tab.url);
+    }
+    
+    // Multiple focus attempts with increasing delay
+    const focusTimes = [50, 200, 500];
+    focusTimes.forEach(time => {
+      setTimeout(() => {
+        if (activeWebview && document.body.contains(activeWebview)) {
+          activeWebview.style.display = "flex";
+          activeWebview.focus();
+        }
+      }, time);
+    });
   }
 
   buildTabBar() {
@@ -32,13 +78,80 @@ class TabBar extends HTMLElement {
     this.appendChild(this.tabContainer);
     this.appendChild(addButton);
     
-    // Add first tab automatically
-    this.addTab();
+    // Don't add first tab automatically here anymore
+    // Will be handled in restoreOrCreateInitialTabs
   }
 
-  addTab(url = "peersky://home", title = "Home") {
-    const tabId = `tab-${this.tabCounter++}`;
+  // Restore persisted tabs or create initial home tab
+  restoreOrCreateInitialTabs() {
+    const persistedTabs = this.loadPersistedTabs();
     
+    if (persistedTabs && persistedTabs.tabs.length > 0) {
+      // Restore persisted tabs
+      this.restoreTabs(persistedTabs);
+    } else {
+      // First time opening browser - create home tab and persist it
+      const homeTabId = this.addTab("peersky://home", "Home");
+      this.saveTabsState();
+    }
+  }
+
+  // Load persisted tabs from localStorage
+  loadPersistedTabs() {
+    try {
+      const stored = localStorage.getItem("peersky-browser-tabs");
+      return stored ? JSON.parse(stored) : null;
+    } catch (error) {
+      console.error("Failed to load persisted tabs:", error);
+      return null;
+    }
+  }
+
+  // Save current tabs state to localStorage
+  saveTabsState() {
+    try {
+      const tabsData = {
+        tabs: this.tabs.map(tab => ({
+          id: tab.id,
+          url: tab.url,
+          title: tab.title
+        })),
+        activeTabId: this.activeTabId,
+        tabCounter: this.tabCounter
+      };
+      localStorage.setItem("peersky-browser-tabs", JSON.stringify(tabsData));
+    } catch (error) {
+      console.error("Failed to save tabs state:", error);
+    }
+  }
+
+  // Restore tabs from persisted data
+  restoreTabs(persistedData) {
+    this.tabCounter = persistedData.tabCounter || 0;
+    let restoredActiveTabId = null;
+
+    // Restore each tab
+    persistedData.tabs.forEach(tabData => {
+      const tabId = this.addTabWithId(tabData.id, tabData.url, tabData.title);
+      if (tabData.id === persistedData.activeTabId) {
+        restoredActiveTabId = tabId;
+      }
+    });
+
+    // Select the previously active tab
+    if (restoredActiveTabId) {
+      this.selectTab(restoredActiveTabId);
+    } else if (this.tabs.length > 0) {
+      // Fallback to first tab if active tab ID not found
+      this.selectTab(this.tabs[0].id);
+    }
+
+    // Force activation after a delay
+    setTimeout(() => this.forceActivateCurrentTab(), 200);
+  }
+
+  // Add tab with specific ID (for restoration)
+  addTabWithId(tabId, url = "peersky://home", title = "Home") {
     // Create tab UI
     const tab = document.createElement("div");
     tab.className = "tab";
@@ -70,7 +183,14 @@ class TabBar extends HTMLElement {
       this.createWebviewForTab(tabId, url);
     }
     
+    return tabId;
+  }
+
+  addTab(url = "peersky://home", title = "Home") {
+    const tabId = `tab-${this.tabCounter++}`;
+    this.addTabWithId(tabId, url, title);
     this.selectTab(tabId);
+    this.saveTabsState(); // Save state when new tab is added
     return tabId;
   }
 
@@ -92,11 +212,20 @@ class TabBar extends HTMLElement {
     webview.style.height = "100%";
     webview.style.display = "none"; // Hide by default
     
+    // Add to container first, then set up events
+    this.webviewContainer.appendChild(webview);
+    
+    // Add a load event to ensure webview is properly initialized
+    webview.addEventListener('dom-ready', () => {
+      // Ensure this webview is visible if it's the active tab
+      if (this.activeTabId === tabId) {
+        webview.style.display = "flex";
+        webview.focus();
+      }
+    });
+    
     // Set up event listeners for this webview
     this.setupWebviewEvents(webview, tabId);
-    
-    // Add to container
-    this.webviewContainer.appendChild(webview);
     
     // Store reference
     this.webviews.set(tabId, webview);
@@ -157,6 +286,15 @@ class TabBar extends HTMLElement {
     const tabIndex = this.tabs.findIndex(tab => tab.id === tabId);
     if (tabIndex === -1) return;
     
+    // Prevent closing the last tab - always keep at least the home tab
+    if (this.tabs.length === 1) {
+      // Instead of closing, navigate to home
+      this.updateTab(tabId, { url: "peersky://home", title: "Home" });
+      this.navigateActiveTab("peersky://home");
+      this.saveTabsState();
+      return;
+    }
+    
     // Remove tab from DOM and array
     tabElement.remove();
     this.tabs.splice(tabIndex, 1);
@@ -174,11 +312,11 @@ class TabBar extends HTMLElement {
       const newTabIndex = Math.max(0, tabIndex - 1);
       if (this.tabs[newTabIndex]) {
         this.selectTab(this.tabs[newTabIndex].id);
-      } else if (this.tabs.length === 0) {
-        // If no tabs left, create a new one
-        this.addTab();
       }
     }
+    
+    // Save state after closing tab
+    this.saveTabsState();
     
     // Dispatch event that tab was closed
     this.dispatchEvent(new CustomEvent("tab-closed", { detail: { tabId } }));
@@ -212,16 +350,22 @@ class TabBar extends HTMLElement {
       // Show the newly active webview
       const newWebview = this.webviews.get(tabId);
       if (newWebview) {
-        newWebview.style.display = "flex"; // Use flex instead of block
+        newWebview.style.display = "flex";
         
-        // Force a layout refresh 
+        // Focus the webview to ensure it gets activated
+        newWebview.focus();
+        
+        // Force a more reliable layout refresh
         setTimeout(() => {
-          if (newWebview.style.display === "flex") {
-            // Quick toggle to force redraw
+          if (newWebview && document.body.contains(newWebview)) {
+            // Quick toggle to force redraw and ensure content is displayed
             newWebview.style.display = "none";
-            setTimeout(() => {
-              newWebview.style.display = "flex";
-            }, 0);
+            requestAnimationFrame(() => {
+              if (newWebview && document.body.contains(newWebview)) {
+                newWebview.style.display = "flex";
+                newWebview.focus();
+              }
+            });
           }
         }, 50);
       }
@@ -235,6 +379,9 @@ class TabBar extends HTMLElement {
         }));
       }
     }
+    
+    // Save state when tab is selected
+    this.saveTabsState();
   }
 
   updateTab(tabId, { url, title }) {
@@ -260,6 +407,9 @@ class TabBar extends HTMLElement {
         }
       }
     }
+    
+    // Save state when tab is updated
+    this.saveTabsState();
   }
 
   getActiveTab() {
@@ -310,6 +460,21 @@ class TabBar extends HTMLElement {
     if (webview) {
       webview.stop();
     }
+  }
+
+  // Setup handler to save tabs when browser closes
+  setupBrowserCloseHandler() {
+    // Save on window beforeunload
+    window.addEventListener("beforeunload", () => {
+      this.saveTabsState();
+    });
+    
+    // Save on visibility change (when app loses focus)
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        this.saveTabsState();
+      }
+    });
   }
 }
 
