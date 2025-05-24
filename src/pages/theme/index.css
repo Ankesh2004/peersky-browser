@@ -142,29 +142,36 @@ find-menu {
   background-color: var(--peersky-nav-background);
   width: 100%;
   height: 36px;
-  overflow-x: auto;
-  overflow-y: hidden;
+  /* overflow-x: hidden; Changed from auto to hidden to prevent scrolling */
+  /* overflow-y: hidden; */
+  overflow: visible;
   white-space: nowrap;
 }
 
 .tab-container {
   display: flex;
   flex-grow: 1;
+  /* max-width: calc(100% - 50px); Reserve space for add button and window controls */
+  /* width: calc(100% - 50px); Fixed width to prevent expanding */
+  /* overflow-x: hidden; Changed from auto to hidden to prevent scrolling */
   overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;;
+  max-width: 100%;
+  min-width: 0;
   scrollbar-width: none; /* Hide scrollbar in Firefox */
-}
-
-.tab-container::-webkit-scrollbar {
-  display: none; /* Hide scrollbar in Chrome/Safari */
+  -ms-overflow-style: none;
 }
 
 .tab {
   display: flex;
   align-items: center;
-  min-width: 180px;
+  min-width: 48px !important;
   max-width: 240px;
+  width: 0;
+  flex: 1 1 auto;
   height: 30px;
-  padding: 0 10px;
+  padding: 0 2px 0 5px; /* Reduced padding */
   margin: 3px 3px 0 0;
   background-color: var(--peersky-background-url-input);
   color: var(--browser-theme-text-color);
@@ -177,6 +184,13 @@ find-menu {
   user-select: none;
   position: relative;
   -webkit-app-region: no-drag; /* Make tabs clickable */
+  box-sizing: border-box;
+}
+
+ /* hide the scrollbar in WebKit browsers */
+ .tab-container::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .tab.active {
@@ -185,33 +199,37 @@ find-menu {
 }
 
 .tab-title {
-  flex-grow: 1;
+  flex: 1 1 0%; /* Allow shrinking */
+  min-width: 0 !important; /* Critical for text truncation */
+  max-width: 100%;
+  width: 0;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding-right: 10px;
+  padding-right: 2px; /* Reduced padding */
   -webkit-app-region: no-drag;
+  font-size: 11px;
 }
 
 .close-tab {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 16px; /* Fixed minimum width */
   width: 16px;
   height: 16px;
+  flex-shrink: 0; /* Prevent from shrinking */
   border-radius: 50%;
   font-size: 14px;
   cursor: pointer;
   color: var(--peersky-nav-button-color);
   -webkit-app-region: no-drag;
-}
-
-.close-tab:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-  color: var(--peersky-nav-button-hover);
+  margin-left: auto;
 }
 
 .add-tab-button {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   width: 28px;
@@ -282,9 +300,12 @@ tracked-box {
 }
 
 .tabbar-container {
-  flex-grow: 1;
-  display: flex;
+  /* flex-grow: 1; */
+  /* display: flex; */
+  flex: 1 1 auto;;
   -webkit-app-region: no-drag; /* Make tabs clickable */
+  min-width: 0;
+  overflow: hidden;;
 }
 
 .window-controls {

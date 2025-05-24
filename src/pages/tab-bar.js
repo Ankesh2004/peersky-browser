@@ -77,6 +77,15 @@ class TabBar extends HTMLElement {
     
     this.appendChild(this.tabContainer);
     this.appendChild(addButton);
+
+    // enable mouse-wheel => horizontal scroll
+    this.tabContainer.addEventListener('wheel', e => {
+    // only intercept vertical scrolls
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      e.preventDefault();
+      this.tabContainer.scrollLeft += e.deltaY;
+    }
+  });
     
     // Don't add first tab automatically here anymore
     // Will be handled in restoreOrCreateInitialTabs
