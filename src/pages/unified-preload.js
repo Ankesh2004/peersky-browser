@@ -119,6 +119,22 @@ const bookmarkAPI = {
   deleteBookmark: (url) => ipcRenderer.invoke('delete-bookmark', { url })
 };
 
+const tabsAPI = {
+  getTabs: () => ipcRenderer.invoke('get-tabs'),
+  closeTab: (id) => ipcRenderer.invoke('close-tab', id),
+  activateTab: (id) => ipcRenderer.invoke('activate-tab', id),
+  groupAction: (action, groupId) => ipcRenderer.invoke('group-action', { action, groupId }),
+  updateGroupProperties: (groupId, properties) => ipcRenderer.send('update-group-properties', groupId, properties),
+  onGroupPropertiesUpdated: (callback) => {
+    ipcRenderer.on('group-properties-updated', (_, groupId, properties) => {
+      try {
+        callback(groupId, properties);
+      } catch (error) {
+        console.error('group-properties-updated callback error:', error);
+      }
+    });
+  }
+};
 // Create context-appropriate APIs
 const settingsAPI = createSettingsAPI(context);
 
@@ -214,17 +230,18 @@ try {
     console.log('Unified-preload: Bookmark APIs exposed (getBookmarks, deleteBookmark)');
     
   } else if (isTabsPage) {
+    contextBridge.exposeInMainWorld('peersky', {
+      environment: environmentAPI,
+      css: cssAPI
+    });
+    
     contextBridge.exposeInMainWorld('electronAPI', {
-      getTabs: () => ipcRenderer.invoke('get-tabs'),
-      closeTab: (id) => ipcRenderer.invoke('close-tab', id),
-      activateTab: (id) => ipcRenderer.invoke('activate-tab', id),
-      groupAction: (action, groupId) => ipcRenderer.invoke('group-action', { action, groupId }),
-      updateGroupProperties: (groupId, properties) => ipcRenderer.send('update-group-properties', groupId, properties),
-      onGroupPropertiesUpdated: (callback) => {
-        ipcRenderer.on('group-properties-updated', (_, groupId, properties) => {
-          callback(groupId, properties);
-        });
-      }
+      getTabs: tabsAPI.getTabs,
+      closeTab: tabsAPI.closeTab,
+      activateTab: tabsAPI.activateTab,
+      groupAction: tabsAPI.groupAction,
+      updateGroupProperties: tabsAPI.updateGroupProperties,
+      onGroupPropertiesUpdated: tabsAPI.onGroupPropertiesUpdated
     })
   } else if (isInternal) {
     // Other internal pages get minimal environment + very limited settings
