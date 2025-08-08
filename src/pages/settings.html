@@ -31,6 +31,10 @@
           <img src="peersky://static/assets/svg/search.svg" class="nav-icon" alt="Search Icon">
           <span>Search</span>
         </a>
+        <a href="#tabs" class="nav-item" data-section="tabs">
+          <img src="peersky://static/assets/svg/tab-right.svg" class="nav-icon" alt="Tabs Icon">
+          <span>Tabs</span>
+        </a>
         <a href="peersky://tabs" class="nav-item">
           <img src="peersky://static/assets/svg/folder.svg" class="nav-icon" alt="Tab Group Icon">
           <span>Tab Groups</span>
@@ -130,6 +134,33 @@
             <div class="setting-label">Clear cache</div>
             <div class="setting-control">
               <button type="button" id="clear-cache" class="btn btn-danger">Clear Cache</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Tabs Section -->
+      <div id="tabs-section" class="settings-page">
+        <h1 class="section-title">Tabs</h1>
+      
+        <section class="settings-section">
+          <div class="setting-row">
+            <div class="setting-label">Enable vertical tabs</div>
+            <div class="setting-control">
+              <label class="toggle-label">
+                <input type="checkbox" id="vertical-tabs" class="toggle-input">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          
+          <div class="setting-row">
+            <div class="setting-label">Auto expand vertical tabs on hover</div>
+            <div class="setting-control">
+              <label class="toggle-label">
+                <input type="checkbox" id="vertical-tabs-expand-on-hover" class="toggle-input">
+                <span class="toggle-slider"></span>
+              </label>
             </div>
           </div>
         </section>

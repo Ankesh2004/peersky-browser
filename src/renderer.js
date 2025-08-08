@@ -9,6 +9,7 @@ const { ipcRenderer } = require("electron");
 
 const DEFAULT_PAGE = "peersky://home";
 let webviewContainer = null; // Will be set dynamically for tabs
+let tabBar; // Holds current tab bar component
 const nav = document.querySelector("#navbox");
 const findMenu = document.querySelector("#find");
 const pageTitle = document.querySelector("title");
@@ -69,7 +70,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   const titleBar = document.querySelector("#titlebar");
-  const tabBar = document.querySelector("#tabbar") || new TabBar();
+  const verticalTabsEnabled = await ipcRenderer.invoke('settings-get', 'verticalTabs');
+  if (verticalTabsEnabled) {
+    const { default: VerticalTabs } = await import('./pages/vertical-tabs.js');
+    tabBar = document.querySelector('#tabbar') || new VerticalTabs();
+  } else {
+    tabBar = document.querySelector('#tabbar') || new TabBar();
+  }
   
   // This is our webview container where all tab webviews will live
   webviewContainer = document.createElement("div");
@@ -109,6 +116,97 @@ document.addEventListener("DOMContentLoaded", async () => {
       console.error('Error handling group action via IPC:', e);
     }
   });
+  ipcRenderer.on('vertical-tabs-expand-on-hover-changed', async (_evt, enabled) => {
+    try {
+      // Fix: use nodeName instead of tagName, and convert to uppercase
+      if (tabBar && tabBar.nodeName && tabBar.nodeName.toUpperCase() === 'VERTICAL-TABS') {
+        if (typeof tabBar.onExpandOnHoverChanged === 'function') {
+          tabBar.onExpandOnHoverChanged(Boolean(enabled));
+        } else {
+          // Fallback: class-based behavior
+          if (enabled) {
+            tabBar.classList.remove('manual-toggle');
+          } else {
+            tabBar.classList.add('manual-toggle');
+            tabBar.classList.remove('expanded');
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to apply expand-on-hover change:', e);
+    }
+  });
+  ipcRenderer.on('vertical-tabs-changed', async (_, enabled) => {
+    const oldBar = tabBar;
+    
+    // Clean up old webviews before creating new tab bar
+    if (oldBar && oldBar.webviews) {
+      oldBar.webviews.forEach((webview) => {
+        if (webview && webview.parentNode) {
+          webview.remove();
+        }
+      });
+      oldBar.webviews.clear();
+    }
+    
+    // Clear existing webviews from container
+    if (webviewContainer) {
+      while (webviewContainer.firstChild) {
+        webviewContainer.removeChild(webviewContainer.firstChild);
+      }
+    }
+    
+    // Remove old tab bar from DOM
+    if (oldBar && oldBar.parentElement) {
+      oldBar.remove();
+    }
+    
+    if (enabled) {
+      const { default: VerticalTabs } = await import('./pages/vertical-tabs.js');
+      tabBar = new VerticalTabs();
+      // Position vertical tabs correctly
+      document.body.appendChild(tabBar);
+    } else {
+      tabBar = new TabBar();
+      // Connect to title bar for horizontal tabs
+      if (titleBar) {
+        titleBar.connectTabBar(tabBar);
+      }
+    }
+    
+    tabBar.connectWebviewContainer(webviewContainer);
+    
+    // The new vertical tab bar respects current setting immediately
+    try {
+      if (enabled && tabBar && tabBar.nodeName && tabBar.nodeName.toUpperCase() === 'VERTICAL-TABS') {
+        const expandOnHover = await ipcRenderer.invoke('settings-get', 'verticalTabsExpandOnHover');
+        if (typeof tabBar.onExpandOnHoverChanged === 'function') {
+          tabBar.onExpandOnHoverChanged(Boolean(expandOnHover));
+        } else if (expandOnHover === false) {
+          tabBar.classList.add('manual-toggle');
+          tabBar.classList.remove('expanded');
+        }
+      }
+    } catch (e) {
+      console.warn('Could not read/apply verticalTabsExpandOnHover:', e);
+    }
+
+    // Force a layout update
+    setTimeout(() => {
+      if (tabBar.style) {
+        tabBar.style.display = 'none';
+        tabBar.offsetHeight; // Trigger reflow
+        tabBar.style.display = '';
+      }
+    }, 100);
+  });
+
+  ipcRenderer.on('load-tab-components', () => {
+    if (tabBar) {
+      tabBar.style.display = '';
+    }
+  });
+  
   if (titleBar && tabBar) {
     titleBar.connectTabBar(tabBar);
   }

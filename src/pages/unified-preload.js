@@ -72,7 +72,7 @@ function createSettingsAPI(pageContext) {
     // Minimal API for other internal pages - only theme
     return {
       get: (key) => {
-        const allowedKeys = ['theme'];
+        const allowedKeys = ['theme', 'verticalTabs'];
         if (!allowedKeys.includes(key)) {
           throw new Error(`Access denied: Internal pages can only access: ${allowedKeys.join(', ')}`);
         }
@@ -133,7 +133,9 @@ const tabsAPI = {
         console.error('group-properties-updated callback error:', error);
       }
     });
-  }
+  },
+  hideTabComponents: () => ipcRenderer.send('hide-tab-components'),
+  loadTabComponents: () => ipcRenderer.send('load-tab-components')
 };
 // Create context-appropriate APIs
 const settingsAPI = createSettingsAPI(context);
@@ -148,6 +150,9 @@ try {
       onSearchEngineChanged: (callback) => createEventListener('search-engine-changed', callback),
       onShowClockChanged: (callback) => createEventListener('show-clock-changed', callback),
       onWallpaperChanged: (callback) => createEventListener('wallpaper-changed', callback),
+      onVerticalTabsChanged: (callback) => createEventListener('vertical-tabs-changed', callback),
+      hideTabComponents: tabsAPI.hideTabComponents,
+      loadTabComponents: tabsAPI.loadTabComponents,
       readCSS: cssAPI.readCSS
     });
     
@@ -241,7 +246,10 @@ try {
       activateTab: tabsAPI.activateTab,
       groupAction: tabsAPI.groupAction,
       updateGroupProperties: tabsAPI.updateGroupProperties,
-      onGroupPropertiesUpdated: tabsAPI.onGroupPropertiesUpdated
+      onGroupPropertiesUpdated: tabsAPI.onGroupPropertiesUpdated,
+      hideTabComponents: tabsAPI.hideTabComponents,
+      loadTabComponents: tabsAPI.loadTabComponents,
+      onVerticalTabsChanged: (callback) => createEventListener('vertical-tabs-changed', callback)
     })
   } else if (isInternal) {
     // Other internal pages get minimal environment + very limited settings
@@ -252,10 +260,10 @@ try {
       }
     });
     
-    // Very minimal electronAPI for theme access only
+    // Very minimal electronAPI for theme and tabs settings
     if (settingsAPI) {
       contextBridge.exposeInMainWorld('electronAPI', {
-        settings: settingsAPI // Uses minimal internal API (theme only)
+        settings: settingsAPI // Uses minimal internal API (theme, verticalTabs)
       });
     }
     

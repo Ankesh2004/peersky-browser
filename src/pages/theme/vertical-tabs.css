@@ -1,0 +1,282 @@
+@import url('browser://theme/vars.css');
+
+.tabbar.vertical-tabs {
+  position: fixed !important;
+  left: 0 !important;
+  top: 88px !important; /* Below the nav bar */
+  width: 48px !important; /* Collapsed width - just enough for favicons */
+  height: calc(100vh - 88px) !important;
+  flex-direction: column !important;
+  background-color: var(--peersky-nav-background) !important;
+  border-right: 1px solid var(--peersky-nav-border-color) !important;
+  z-index: 1000 !important;
+  transition: width 0.3s ease !important;
+  overflow: hidden !important;
+}
+
+/* Hover expansion (only when not in manual toggle mode) */
+.tabbar.vertical-tabs:not(.manual-toggle):hover {
+  width: 200px !important; /* Expanded width on hover */
+}
+
+/* Manual expansion (when expanded class is added) */
+.tabbar.vertical-tabs.expanded {
+  width: 200px !important; /* Expanded width */
+}
+
+/* Toggle button styling */
+.vertical-tabs-toggle {
+  position: absolute !important;
+  top: 4px !important;
+  right: 4px !important;
+  width: 24px !important;
+  height: 24px !important;
+  background: var(--peersky-nav-button-color) !important;
+  border: none !important;
+  border-radius: 4px !important;
+  color: var(--peersky-nav-background) !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+  z-index: 1001 !important;
+  transition: all 0.2s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.vertical-tabs-toggle:hover {
+  background: var(--peersky-nav-button-hover) !important;
+  transform: scale(1.1) !important;
+}
+
+.tabbar.vertical-tabs .tab-container {
+  flex-direction: column !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  height: 100% !important;
+  width: 100% !important;
+  padding: 4px !important;
+  /* Remove flex-grow to prevent tabs from stretching */
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+}
+
+/* Adjust padding when toggle button is visible */
+.tabbar.vertical-tabs.manual-toggle .tab-container {
+  padding-top: 32px !important; /* Make room for toggle button */
+}
+
+.tabbar.vertical-tabs .tab {
+  max-width: none !important;
+  width: 40px !important; /* Fixed square tab size when collapsed */
+  height: 40px !important; /* Fixed square tab size when collapsed */
+  min-height: 40px !important; /* Prevent shrinking */
+  max-height: 40px !important; /* Prevent growing */
+  margin: 2px 0 !important;
+  border-radius: 8px !important;
+  padding: 8px !important;
+  justify-content: center !important;
+  align-items: center !important;
+  transition: all 0.3s ease !important;
+  position: relative !important;
+  overflow: hidden !important;
+  flex-shrink: 0 !important; /* Prevent shrinking */
+  flex-grow: 0 !important; /* Prevent growing */
+  box-sizing: border-box !important;
+}
+
+/* Expanded state - works for both hover and manual toggle */
+.tabbar.vertical-tabs:hover .tab,
+.tabbar.vertical-tabs.expanded .tab {
+  width: calc(100% - 8px) !important; /* Full width when expanded */
+  height: 40px !important; /* Keep consistent height */
+  justify-content: flex-start !important;
+  padding: 8px 12px !important;
+}
+
+/* Tab favicon styling */
+.tabbar.vertical-tabs .tab-favicon {
+  width: 20px !important;
+  height: 20px !important;
+  margin: 0 !important;
+  flex-shrink: 0 !important;
+  order: 1 !important;
+}
+
+/* Tab title - hidden by default, shown when expanded */
+.tabbar.vertical-tabs .tab-title {
+  display: none !important;
+  margin-left: 8px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: 13px !important;
+  order: 2 !important;
+  max-width: 120px !important;
+}
+
+.tabbar.vertical-tabs:hover .tab-title,
+.tabbar.vertical-tabs.expanded .tab-title {
+  display: block !important;
+}
+
+/* Close button - hidden by default, shown when expanded */
+.tabbar.vertical-tabs .close-tab {
+  display: none !important;
+  margin-left: auto !important;
+  margin-right: 0 !important;
+  width: 16px !important;
+  height: 16px !important;
+  font-size: 14px !important;
+  order: 3 !important;
+  opacity: 0.7 !important;
+}
+
+.tabbar.vertical-tabs:hover .close-tab,
+.tabbar.vertical-tabs.expanded .close-tab {
+  display: flex !important;
+}
+
+.tabbar.vertical-tabs .tab:hover .close-tab {
+  opacity: 1 !important;
+}
+
+/* Add tab button - also fixed square size when collapsed */
+.tabbar.vertical-tabs .add-tab-button {
+  width: 40px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  max-height: 32px !important;
+  margin: 4px 0 !important;
+  border-radius: 8px !important;
+  font-size: 18px !important;
+  transition: all 0.3s ease !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+.tabbar.vertical-tabs:hover .add-tab-button,
+.tabbar.vertical-tabs.expanded .add-tab-button {
+  width: calc(100% - 8px) !important;
+}
+
+/* Active tab styling */
+.tabbar.vertical-tabs .tab.active {
+  background-color: var(--browser-theme-primary-highlight) !important;
+  border-radius: 8px !important;
+  border: none !important;
+  height: 40px !important;
+  margin-bottom: 2px !important;
+}
+
+.tabbar.vertical-tabs .tab.active .tab-title {
+  color: var(--browser-theme-background) !important;
+}
+
+.tabbar.vertical-tabs .tab.active .close-tab {
+  color: var(--browser-theme-background) !important;
+}
+
+/* Tab group headers in vertical mode - also fixed size when collapsed */
+.tabbar.vertical-tabs .tab-group-header {
+  width: 40px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
+  margin: 4px 0 !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  transition: all 0.3s ease !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+.tabbar.vertical-tabs:hover .tab-group-header,
+.tabbar.vertical-tabs.expanded .tab-group-header {
+  width: calc(100% - 8px) !important;
+  justify-content: flex-start !important;
+  padding: 0 8px !important;
+}
+
+.tabbar.vertical-tabs .tab-group-title {
+  display: none !important;
+}
+
+.tabbar.vertical-tabs:hover .tab-group-title,
+.tabbar.vertical-tabs.expanded .tab-group-title {
+  display: block !important;
+}
+
+.tabbar.vertical-tabs .tab-group-controls {
+  display: none !important;
+}
+
+.tabbar.vertical-tabs:hover .tab-group-controls,
+.tabbar.vertical-tabs.expanded .tab-group-controls {
+  display: flex !important;
+}
+
+/* Adjust webview container when vertical tabs are enabled */
+body:has(.tabbar.vertical-tabs) .webview-container {
+  left: 48px !important;
+  width: calc(100% - 48px) !important;
+  transition: left 0.3s ease, width 0.3s ease !important;
+}
+
+/* Webview adjustment for expanded state (both hover and manual) */
+body:has(.tabbar.vertical-tabs:hover) .webview-container,
+body:has(.tabbar.vertical-tabs.expanded) .webview-container {
+  left: 200px !important;
+  width: calc(100% - 200px) !important;
+}
+
+/* Loading indicator for vertical tabs */
+.tabbar.vertical-tabs .tab.loading .tab-favicon::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--peersky-nav-button-color);
+  border-top: 2px solid var(--peersky-nav-button-active);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* P2P indicator positioning for vertical tabs */
+.tabbar.vertical-tabs .p2p-indicator {
+  position: absolute !important;
+  top: 2px !important;
+  right: 2px !important;
+  width: 8px !important;
+  height: 8px !important;
+  margin: 0 !important;
+  border-radius: 50% !important;
+  background-color: var(--browser-theme-primary-highlight) !important;
+}
+
+/* Pinned tabs indicator */
+.tabbar.vertical-tabs .tab.pinned::before {
+  content: '📌' !important;
+  position: absolute !important;
+  top: 2px !important;
+  left: 2px !important;
+  font-size: 8px !important;
+}
+
+/* Mute indicator */
+.tabbar.vertical-tabs .mute-indicator {
+  position: absolute !important;
+  bottom: 2px !important;
+  right: 2px !important;
+  font-size: 8px !important;
+  margin: 0 !important;
+}

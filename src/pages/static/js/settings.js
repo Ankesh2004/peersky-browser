@@ -129,6 +129,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       eventCleanupFunctions.push(cleanup3);
     }
     
+    if (settingsAPI.onVerticalTabsChanged) {
+      const cleanup4 = settingsAPI.onVerticalTabsChanged((enabled) => {
+        const verticalToggle = document.getElementById('vertical-tabs');
+        if (verticalToggle && verticalToggle.checked !== enabled) {
+          verticalToggle.checked = enabled;
+        }
+      });
+      eventCleanupFunctions.push(cleanup4);
+    }
+
     if (settingsAPI.onWallpaperChanged) {
       const cleanup4 = settingsAPI.onWallpaperChanged((wallpaperType) => {
         const wallpaperSelector = document.getElementById('wallpaper-selector');
@@ -138,6 +148,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
       eventCleanupFunctions.push(cleanup4);
+    }
+
+    if (settingsAPI.onVerticalTabsExpandOnHoverChanged) {
+      const cleanup5 = settingsAPI.onVerticalTabsExpandOnHoverChanged((enabled) => {
+        const expandOnHoverToggle = document.getElementById('vertical-tabs-expand-on-hover');
+        if (expandOnHoverToggle && expandOnHoverToggle.checked !== enabled) {
+          expandOnHoverToggle.checked = enabled;
+        }
+      });
+      eventCleanupFunctions.push(cleanup5);
     }
   } catch (error) {
     console.error('Settings: Failed to set up event listeners:', error);
@@ -153,6 +173,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const searchEngine = document.getElementById('search-engine');
   const themeToggle = document.getElementById('theme-toggle');
   const showClock = document.getElementById('show-clock');
+  const verticalTabs = document.getElementById('vertical-tabs');
+  const verticalTabsExpandOnHover = document.getElementById('vertical-tabs-expand-on-hover');
   const wallpaperSelector = document.getElementById('wallpaper-selector');
   const wallpaperFile = document.getElementById('wallpaper-file');
   const wallpaperBrowse = document.getElementById('wallpaper-browse');
@@ -280,6 +302,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     await saveSettingToBackend('showClock', e.target.checked);
   });
 
+  verticalTabs?.addEventListener('change', async (e) => {
+    const enabled = e.target.checked;
+    console.log('Vertical tabs changed:', enabled);
+    await saveSettingToBackend('verticalTabs', enabled);
+    try {
+      if (enabled) {
+        settingsAPI.hideTabComponents?.();
+      } else {
+        settingsAPI.loadTabComponents?.();
+      }
+    } catch (err) {
+      console.error('Failed to toggle tab components:', err);
+    }
+  });
+
+  if (verticalTabsExpandOnHover) {
+    verticalTabsExpandOnHover.addEventListener('change', async (e) => {
+      try {
+        if (settingsAPI && settingsAPI.setSetting) {
+          await settingsAPI.setSetting('verticalTabsExpandOnHover', e.target.checked);
+        }
+      } catch (error) {
+        console.error('Settings: Failed to save verticalTabsExpandOnHover setting:', error);
+      }
+    });
+  }
+
   // Initialize custom wallpaper UI state
   updateCustomWallpaperUI(false);
   
@@ -291,11 +340,13 @@ function loadDefaultSettings() {
   const searchEngine = document.getElementById('search-engine');
   const themeToggle = document.getElementById('theme-toggle');
   const showClock = document.getElementById('show-clock');
+  const verticalTabs = document.getElementById('vertical-tabs');
   const wallpaperSelector = document.getElementById('wallpaper-selector');
   
   if (searchEngine) searchEngine.value = 'duckduckgo';
   if (themeToggle) themeToggle.value = 'dark';
   if (showClock) showClock.checked = true;
+  if (verticalTabs) verticalTabs.checked = false;
   if (wallpaperSelector) wallpaperSelector.value = 'redwoods';
 }
 
@@ -322,6 +373,8 @@ function populateFormFields(settings) {
   const searchEngine = document.getElementById('search-engine');
   const themeToggle = document.getElementById('theme-toggle');
   const showClock = document.getElementById('show-clock');
+  const verticalTabs = document.getElementById('vertical-tabs');
+  const verticalTabsExpandOnHover = document.getElementById('vertical-tabs-expand-on-hover');
   const wallpaperSelector = document.getElementById('wallpaper-selector');
   
   if (searchEngine && settings.searchEngine) {
@@ -335,6 +388,12 @@ function populateFormFields(settings) {
   }
   if (showClock && typeof settings.showClock === 'boolean') {
     showClock.checked = settings.showClock;
+  }
+  if (verticalTabs && typeof settings.verticalTabs === 'boolean') {
+    verticalTabs.checked = settings.verticalTabs;
+  }
+  if (verticalTabsExpandOnHover && typeof settings.verticalTabsExpandOnHover !== 'undefined') {
+    verticalTabsExpandOnHover.checked = settings.verticalTabsExpandOnHover;
   }
   if (wallpaperSelector && settings.wallpaper) {
     // Only set built-in wallpaper values, ignore custom
@@ -374,7 +433,8 @@ async function saveSettingToBackend(key, value) {
       'searchEngine': 'Search engine updated successfully!',
       'theme': 'Theme updated successfully!',
       'showClock': 'Clock setting updated successfully!',
-      'wallpaper': 'Wallpaper updated successfully!'
+      'wallpaper': 'Wallpaper updated successfully!',
+      'verticalTabs': 'Vertical tabs setting updated successfully!'
     };
     
     const message = successMessages[key] || `${key} updated successfully!`;
@@ -388,7 +448,8 @@ async function saveSettingToBackend(key, value) {
       'searchEngine': 'Failed to save search engine setting',
       'theme': 'Failed to save theme setting',
       'showClock': 'Failed to save clock setting',
-      'wallpaper': 'Failed to save wallpaper setting'
+      'wallpaper': 'Failed to save wallpaper setting',
+      'verticalTabs': 'Failed to save vertical tabs setting'
     };
     
     const errorMessage = errorMessages[key] || `Failed to save ${key} setting`;
@@ -470,7 +531,7 @@ function initializeSidebarNavigation() {
   // Check for hash-based navigation (backward compatibility)
   else if (currentPath.includes('#')) {
     const hashSection = currentPath.replace('#', '');
-    if (hashSection && ['appearance', 'search', 'extensions'].includes(hashSection)) {
+    if (hashSection && ['appearance', 'search', 'tabs', 'extensions'].includes(hashSection)) {
       targetSection = hashSection;
     }
   }
